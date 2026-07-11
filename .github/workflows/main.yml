@@ -17,7 +17,7 @@ jobs:
 
       # Deploy Firestore Rules
       - name: Deploy Firestore Rules
-        run: npx firebase-tools deploy --only firestore:rules
+        run: npx firebase-tools deploy --only firestore:rules --project yaddstore
         env:
           GOOGLE_APPLICATION_CREDENTIALS: $HOME/firebase-key.json
 
