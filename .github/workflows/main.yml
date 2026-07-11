@@ -11,13 +11,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Deploy Firestore Security Rules
+      # Menulis service account JSON ke file
+      - name: Write Firebase Service Account
+        run: echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > $HOME/firebase-key.json
+
+      # Deploy Firestore Rules
       - name: Deploy Firestore Rules
-        uses: w9jds/firebase-action@master
-        with:
-          args: deploy --only firestore:rules
+        run: npx firebase-tools deploy --only firestore:rules
         env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          GOOGLE_APPLICATION_CREDENTIALS: $HOME/firebase-key.json
 
       # Deploy Hosting
       - uses: FirebaseExtended/action-hosting-deploy@v0
