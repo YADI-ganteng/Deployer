@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Menulis service account JSON ke file
+      # Tulis service account JSON ke file
       - name: Write Firebase Service Account
         run: echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > $HOME/firebase-key.json
 
