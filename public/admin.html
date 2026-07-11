@@ -1,1 +1,546 @@
-public
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>YaddStore - Admin Panel</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',sans-serif; }
+        body { background:#0a0a12; color:#eee; padding:10px; min-height:100vh; font-size:16px; }
+        .container { max-width:100%; margin:0 auto; }
+        .login-wrap { display:flex; justify-content:center; align-items:center; min-height:100vh; }
+        .login-box { background:rgba(255,255,255,0.05); padding:30px 20px; border-radius:20px; border:1px solid rgba(255,255,255,0.1); width:100%; max-width:360px; text-align:center; }
+        .login-box h2 { margin-bottom:20px; font-size:1.5em; }
+        .login-box input { width:100%; padding:14px; margin:8px 0; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.1); border-radius:10px; color:#fff; font-size:1em; }
+        .login-box button { width:100%; padding:14px; background:linear-gradient(45deg,#ff6b6b,#ee5a24); border:none; border-radius:10px; color:#fff; font-weight:bold; cursor:pointer; font-size:1em; }
+        .header { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:15px; flex-wrap:wrap; gap:8px; }
+        .header h1 { font-size:1.4em; }
+        .logout { background:#ff6b6b; border:none; padding:8px 15px; border-radius:8px; color:#fff; cursor:pointer; font-size:0.9em; }
+        .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:15px; }
+        .tabs button { padding:8px 12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:#aaa; cursor:pointer; transition:0.3s; font-size:0.85em; white-space:nowrap; }
+        .tabs button.active { background:#ff6b6b; color:#fff; border-color:#ff6b6b; }
+        .panel { display:none; background:rgba(255,255,255,0.03); padding:15px; border-radius:16px; border:1px solid rgba(255,255,255,0.05); }
+        .panel.active { display:block; }
+        .badge { padding:3px 8px; border-radius:20px; font-size:0.7em; font-weight:600; }
+        .badge.pending { background:#ffb347; color:#000; }
+        .badge.done { background:#2ed573; color:#000; }
+        .badge.cancel { background:#ff6b6b; color:#fff; }
+        .btn-sm { padding:6px 12px; border:none; border-radius:6px; cursor:pointer; margin:3px 2px; font-size:0.85em; display:inline-block; }
+        .btn-sm.danger { background:#ff6b6b; color:#fff; }
+        .btn-sm.success { background:#2ed573; color:#000; }
+        .btn-sm.primary { background:#4a9eff; color:#fff; }
+        .form-group { margin:12px 0; }
+        .form-group label { display:block; font-size:0.9em; color:#ccc; margin-bottom:5px; }
+        .form-group input,.form-group select { width:100%; padding:12px 14px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#fff; font-size:1em; }
+        .form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        @media(max-width:500px){ .form-row { grid-template-columns:1fr; } }
+        .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#2ed573; padding:12px 24px; border-radius:10px; display:none; z-index:999; font-weight:600; max-width:90vw; text-align:center; }
+        .toast.err { background:#ff6b6b; }
+        .debug-log { position:fixed; bottom:70px; left:10px; right:10px; background:rgba(0,0,0,0.9); color:#0f0; padding:8px; border-radius:8px; font-size:0.7em; max-height:120px; overflow-y:auto; display:none; z-index:1000; }
+        .copy-log-btn { position:absolute; top:4px; right:8px; background:rgba(255,255,255,0.2); border:none; color:#fff; padding:4px 10px; border-radius:6px; font-size:0.75em; cursor:pointer; z-index:10; }
+        .alert-popup { position:fixed; top:20px; left:10px; right:10px; background:#ff6b6b; color:#fff; padding:12px; border-radius:12px; z-index:2000; display:none; text-align:center; font-weight:bold; }
+        .section-title { font-size:1.1em; color:#ffd93d; margin:20px 0 10px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:5px; }
+        .cover-preview img { width:70px; height:70px; object-fit:cover; margin:4px; cursor:pointer; border-radius:8px; }
+        .cover-preview img:hover { transform:scale(1.05); }
+        .selected-cover { border:3px solid #ff6b6b !important; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div id="loginWrap" class="login-wrap">
+        <div class="login-box">
+            <h2>🔐 Admin Panel</h2>
+            <input type="password" id="adminPass" placeholder="Password">
+            <button onclick="adminLogin()">MASUK</button>
+            <div style="margin-top:10px;font-size:0.8em;color:#666;">Default: admin123</div>
+        </div>
+    </div>
+
+    <div id="mainPanel" style="display:none;">
+        <div class="container">
+            <div class="header"><h1>🛠️ Admin Panel</h1><button class="logout" onclick="adminLogout()">🚪 Logout</button></div>
+            <div class="tabs" id="tabButtons">
+                <button class="active" data-tab="dashboard">📊</button>
+                <button data-tab="orders">📋</button>
+                <button data-tab="categories">📦</button>
+                <button data-tab="payments">💳</button>
+                <button data-tab="coupons">🏷️</button>
+                <button data-tab="banners">🖼️</button>
+                <button data-tab="settings">⚙️</button>
+            </div>
+
+            <!-- Dashboard -->
+            <div class="panel active" id="panel-dashboard">
+                <div class="card-stats" id="statsCards" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:10px;"></div>
+                <div id="recentOrders"></div>
+            </div>
+
+            <!-- Orders -->
+            <div class="panel" id="panel-orders">
+                <div style="display:flex;gap:6px;margin-bottom:10px;">
+                    <input type="text" id="searchOrder" placeholder="Cari..." style="flex:1;" oninput="loadOrders()">
+                    <select id="filterStatus" onchange="loadOrders()">
+                        <option value="all">Semua</option>
+                        <option value="pending">Pending</option>
+                        <option value="done">Selesai</option>
+                    </select>
+                </div>
+                <div id="orderList" style="overflow-x:auto;"></div>
+            </div>
+
+            <!-- Categories -->
+            <div class="panel" id="panel-categories">
+                <div class="section-title">🎮 Game & Voucher</div>
+                <div class="form-group"><label>Key (unik)</label><input id="catKey" placeholder="mlbb"></div>
+                <div class="form-group"><label>Nama</label><input id="catName" placeholder="Mobile Legends"></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Tipe</label><select id="catType" onchange="toggleCatInputs()">
+                        <option value="game">Game</option>
+                        <option value="voucher">Voucher</option>
+                    </select></div>
+                    <div class="form-group"><label>Unit</label><input id="catUnit" placeholder="Diamond"></div>
+                </div>
+                <div class="form-group"><label>Icon (emoji)</label><input id="catIcon" placeholder="⚔️"></div>
+                <div class="form-group" id="serverOptionsGroup">
+                    <label>Server (koma)</label><input id="catServers" placeholder="ID,Indonesia">
+                </div>
+                <div class="form-group">
+                    <label>Cover (boleh kosong)</label>
+                    <input type="text" id="coverUrl" placeholder="https://...">
+                    <button type="button" class="btn-sm primary" onclick="searchCover()" style="margin-top:5px;">🔍 Cari Cover</button>
+                    <div id="coverPreview" class="cover-preview" style="margin-top:8px;"></div>
+                </div>
+                <button class="btn-sm success" onclick="addCategory()" style="width:100%;padding:12px;font-size:1em;">➕ Tambah Game/Voucher</button>
+                <hr style="margin:20px 0;border-color:rgba(255,255,255,0.1);">
+                <div id="gameVoucherList"></div>
+
+                <div class="section-title">🕹️ Mini Game</div>
+                <div class="form-group"><label>Key (unik)</label><input id="miniKey" placeholder="snake"></div>
+                <div class="form-group"><label>Nama Game</label><input id="miniName" placeholder="Snake Game"></div>
+                <div class="form-group"><label>Icon (emoji)</label><input id="miniIcon" placeholder="🐍"></div>
+                <div class="form-group"><label>Upload File HTML</label><input type="file" id="miniFile" accept=".html"></div>
+                <div class="form-group">
+                    <label>Cover (boleh kosong)</label>
+                    <input type="text" id="miniCoverUrl" placeholder="https://...">
+                    <button type="button" class="btn-sm primary" onclick="searchMiniCover()" style="margin-top:5px;">🔍 Cari Cover</button>
+                    <div id="miniCoverPreview" class="cover-preview" style="margin-top:8px;"></div>
+                </div>
+                <button class="btn-sm success" onclick="addMiniGame()" style="width:100%;padding:12px;font-size:1em;">➕ Tambah Mini Game</button>
+                <hr style="margin:20px 0;border-color:rgba(255,255,255,0.1);">
+                <div id="miniGameList"></div>
+            </div>
+
+            <!-- Payments -->
+            <div class="panel" id="panel-payments">
+                <div class="form-row">
+                    <div class="form-group"><label>Nama</label><input id="payMethod" placeholder="Dana"></div>
+                    <div class="form-group"><label>Nomor</label><input id="payNumber" placeholder="083170617054"></div>
+                </div>
+                <button class="btn-sm success" onclick="addPayment()">➕ Tambah</button>
+                <hr>
+                <div id="paymentList"></div>
+            </div>
+
+            <!-- Coupons -->
+            <div class="panel" id="panel-coupons">
+                <div class="form-row">
+                    <div class="form-group"><label>Kode</label><input id="couponCode" placeholder="HEMAT10"></div>
+                    <div class="form-group"><label>Diskon %</label><input id="couponDiscount" type="number" placeholder="10"></div>
+                </div>
+                <button class="btn-sm success" onclick="addCoupon()">➕ Tambah</button>
+                <hr>
+                <div id="couponList"></div>
+            </div>
+
+            <!-- Banners -->
+            <div class="panel" id="panel-banners">
+                <div class="form-group"><label>URL Gambar</label><input id="bannerUrl" placeholder="https://..."></div>
+                <button class="btn-sm success" onclick="addBanner()">➕ Tambah</button>
+                <hr>
+                <div id="bannerList"></div>
+            </div>
+
+            <!-- Settings -->
+            <div class="panel" id="panel-settings">
+                <div class="form-group"><label>Password Baru</label><input id="newAdminPass" placeholder="admin123"></div>
+                <button class="btn-sm success" onclick="saveAdminPass()">💾 Simpan</button>
+                <hr>
+                <button class="btn-sm danger" onclick="resetToDefault()">🔄 Reset ke Default</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="debug-log" id="debugLog" style="position:relative;">
+    <button class="copy-log-btn" onclick="copyLog()">📋 Salin</button>
+</div>
+<div class="alert-popup" id="alertPopup"></div>
+
+<script>
+    // ========== LOGGING & COPY ==========
+    function addDebugLog(msg, isError = false) {
+        const logDiv = document.getElementById('debugLog');
+        logDiv.style.display = 'block';
+        const line = document.createElement('div');
+        line.textContent = '• ' + msg;
+        line.style.color = isError ? '#ff6b6b' : '#0f0';
+        logDiv.appendChild(line);
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+    function copyLog() {
+        const logDiv = document.getElementById('debugLog');
+        const lines = [];
+        logDiv.childNodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'DIV' && !node.classList.contains('copy-log-btn')) {
+                lines.push(node.textContent);
+            }
+        });
+        const text = lines.join('\n');
+        if (!text) return toast('Log kosong','err');
+        navigator.clipboard.writeText(text).then(()=>toast('✅ Log disalin')).catch(()=>{
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            toast('✅ Log disalin (fallback)');
+        });
+    }
+
+    function showAlert(msg) {
+        const el = document.getElementById('alertPopup');
+        el.textContent = msg;
+        el.style.display = 'block';
+        clearTimeout(el._t);
+        el._t = setTimeout(() => el.style.display = 'none', 4000);
+    }
+
+    // ========== FIREBASE ==========
+    const firebaseConfig = {
+        apiKey: "AIzaSyBMwguFp5Az8Q4KPVkq6etrhrEY_fHrlgo",
+        authDomain: "yaddstore.firebaseapp.com",
+        projectId: "yaddstore",
+        storageBucket: "yaddstore.firebasestorage.app",
+        messagingSenderId: "1086200506513",
+        appId: "1:1086200506513:web:9ee304eb4d8fe78d88f730"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    function toast(msg, type) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast' + (type === 'err' ? ' err' : '');
+        t.style.display = 'block';
+        clearTimeout(t._t);
+        t._t = setTimeout(() => t.style.display = 'none', 3000);
+        addDebugLog(`Toast: ${msg}`);
+    }
+
+    let configData = {
+        categories: {
+            hok: { name:"Honor of Kings", type:"game", icon:"👑", unit:"Token", serverOptions:[{value:"Asia",text:"Asia"}], packages:[], gameUrl:"", coverUrl:"" },
+            kuota: { name:"Kuota Internet", type:"voucher", icon:"📱", unit:"GB", serverOptions:[], packages:[], gameUrl:"", coverUrl:"" }
+        },
+        payments: [{method:"Dana",number:"083170617054",icon:"💙"}],
+        coupons: {},
+        banners: [],
+        adminPass: "admin123",
+        background: {}
+    };
+
+    async function loadConfig() {
+        try {
+            const doc = await db.collection('config').doc('settings').get();
+            if (doc.exists) configData = doc.data();
+            else await db.collection('config').doc('settings').set(configData);
+        } catch(e) { showAlert('Gagal load config: '+e.message); }
+    }
+    async function saveConfig() {
+        await db.collection('config').doc('settings').set(configData, {merge:true});
+    }
+
+    // ========== LOGIN ==========
+    async function adminLogin() {
+        await loadConfig();
+        if (document.getElementById('adminPass').value === configData.adminPass) {
+            document.getElementById('loginWrap').style.display = 'none';
+            document.getElementById('mainPanel').style.display = 'block';
+            loadAll();
+        } else {
+            toast('Password salah','err');
+            showAlert('Password salah!');
+        }
+    }
+    function adminLogout() { location.reload(); }
+
+    function loadAll() {
+        renderGameVoucherList();
+        renderMiniGameList();
+        renderPayments();
+        renderCoupons();
+        renderBanners();
+    }
+
+    // ========== KATEGORI ==========
+    function toggleCatInputs() {
+        document.getElementById('serverOptionsGroup').style.display = 
+            document.getElementById('catType').value === 'game' ? 'block' : 'none';
+    }
+
+    async function addCategory() {
+        const key = document.getElementById('catKey').value.trim().toLowerCase().replace(/\s/g,'');
+        const name = document.getElementById('catName').value.trim();
+        const type = document.getElementById('catType').value;
+        const unit = document.getElementById('catUnit').value.trim();
+        const icon = document.getElementById('catIcon').value.trim() || '📦';
+        const servers = document.getElementById('catServers').value.trim();
+        const coverUrl = document.getElementById('coverUrl').value.trim();
+
+        if (!key || !name || !unit) {
+            showAlert('Key, Nama, Unit wajib diisi');
+            return;
+        }
+        if (configData.categories[key]) {
+            showAlert('Key sudah ada');
+            return;
+        }
+
+        configData.categories[key] = {
+            name, type, icon, unit,
+            serverOptions: type === 'game' ? servers.split(',').map(s => ({value:s.trim(),text:s.trim()})) : [],
+            packages: [],
+            gameUrl: '',
+            coverUrl
+        };
+        await saveConfig();
+        renderGameVoucherList();
+        toast('✅ Ditambahkan');
+        document.getElementById('catKey').value = '';
+        document.getElementById('catName').value = '';
+        document.getElementById('catUnit').value = '';
+        document.getElementById('catServers').value = '';
+        document.getElementById('coverUrl').value = '';
+        document.getElementById('coverPreview').innerHTML = '';
+    }
+
+    function renderGameVoucherList() {
+        const container = document.getElementById('gameVoucherList');
+        const cats = Object.entries(configData.categories || {}).filter(([k,c]) => c.type !== 'minigame');
+        if (!cats.length) { container.innerHTML = '<div style="color:#aaa;">Belum ada.</div>'; return; }
+        let html = '';
+        for (const [key, cat] of cats) {
+            const cover = cat.coverUrl ? `<img src="${cat.coverUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-right:8px;">` : '';
+            html += `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;">${cover}${cat.icon} ${cat.name} (${cat.unit})</div>
+                <button class="btn-sm danger" onclick="deleteCategory('${key}')">🗑️</button>
+            </div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    async function deleteCategory(key) {
+        if (!confirm('Hapus?')) return;
+        delete configData.categories[key];
+        await saveConfig();
+        renderGameVoucherList();
+        renderMiniGameList();
+    }
+
+    // ========== MINI GAME ==========
+    async function addMiniGame() {
+        const key = document.getElementById('miniKey').value.trim().toLowerCase().replace(/\s/g,'');
+        const name = document.getElementById('miniName').value.trim();
+        const icon = document.getElementById('miniIcon').value.trim() || '🕹️';
+        const fileInput = document.getElementById('miniFile');
+        const coverUrl = document.getElementById('miniCoverUrl').value.trim();
+
+        if (!key || !name) { showAlert('Key dan Nama wajib'); return; }
+        if (!fileInput.files[0]) { showAlert('Pilih file HTML'); return; }
+
+        try {
+            const file = fileInput.files[0];
+            const ref = storage.ref('minigames/' + key + '.html');
+            await ref.put(file);
+            const gameUrl = await ref.getDownloadURL();
+
+            configData.categories[key] = {
+                name, type:'minigame', icon, unit:'',
+                serverOptions:[], packages:[],
+                gameUrl, coverUrl
+            };
+            await saveConfig();
+            renderMiniGameList();
+            toast('✅ Mini Game ditambahkan');
+            document.getElementById('miniKey').value = '';
+            document.getElementById('miniName').value = '';
+            document.getElementById('miniCoverUrl').value = '';
+            document.getElementById('miniFile').value = '';
+        } catch(e) { showAlert('Gagal upload: '+e.message); }
+    }
+
+    function renderMiniGameList() {
+        const container = document.getElementById('miniGameList');
+        const minigames = Object.entries(configData.categories || {}).filter(([k,c]) => c.type === 'minigame');
+        if (!minigames.length) { container.innerHTML = '<div style="color:#aaa;">Belum ada.</div>'; return; }
+        let html = '';
+        for (const [key, cat] of minigames) {
+            const cover = cat.coverUrl ? `<img src="${cat.coverUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;margin-right:8px;">` : '';
+            html += `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;">${cover}${cat.icon} ${cat.name}</div>
+                <button class="btn-sm danger" onclick="deleteMiniGame('${key}')">🗑️</button>
+            </div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    async function deleteMiniGame(key) {
+        if (!confirm('Hapus?')) return;
+        delete configData.categories[key];
+        await saveConfig();
+        renderMiniGameList();
+    }
+
+    // ========== SEARCH COVER ==========
+    const GOOGLE_API_KEY = 'AIzaSyC9vrCuvdmuBZjBXJAI2rMF_CCi1nTT3Ks';
+    const SEARCH_ENGINE_ID = '877f61e9779264adc';
+
+    async function searchCover() {
+        const query = document.getElementById('catName').value.trim();
+        if (!query) { showAlert('Isi nama dulu'); return; }
+        try {
+            const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${SEARCH_ENGINE_ID}&searchType=image&q=${encodeURIComponent(query)}+cover&num=3`;
+            const res = await fetch(url);
+            const data = await res.json();
+            const container = document.getElementById('coverPreview');
+            container.innerHTML = '';
+            if (data.items) {
+                data.items.forEach(item => {
+                    const img = document.createElement('img');
+                    img.src = item.link;
+                    img.onclick = () => {
+                        document.getElementById('coverUrl').value = item.link;
+                        container.querySelectorAll('img').forEach(i => i.classList.remove('selected-cover'));
+                        img.classList.add('selected-cover');
+                    };
+                    container.appendChild(img);
+                });
+            } else container.innerHTML = '<span style="color:#aaa;">Tidak ditemukan.</span>';
+        } catch(e) { showAlert('Gagal cari gambar'); }
+    }
+
+    async function searchMiniCover() {
+        const query = document.getElementById('miniName').value.trim();
+        if (!query) { showAlert('Isi nama dulu'); return; }
+        try {
+            const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${SEARCH_ENGINE_ID}&searchType=image&q=${encodeURIComponent(query)}+game&num=3`;
+            const res = await fetch(url);
+            const data = await res.json();
+            const container = document.getElementById('miniCoverPreview');
+            container.innerHTML = '';
+            if (data.items) {
+                data.items.forEach(item => {
+                    const img = document.createElement('img');
+                    img.src = item.link;
+                    img.onclick = () => {
+                        document.getElementById('miniCoverUrl').value = item.link;
+                        container.querySelectorAll('img').forEach(i => i.classList.remove('selected-cover'));
+                        img.classList.add('selected-cover');
+                    };
+                    container.appendChild(img);
+                });
+            } else container.innerHTML = '<span style="color:#aaa;">Tidak ditemukan.</span>';
+        } catch(e) { showAlert('Gagal cari gambar'); }
+    }
+
+    // ========== PAYMENTS ==========
+    function renderPayments() {
+        document.getElementById('paymentList').innerHTML = (configData.payments||[]).map((p,i) => 
+            `<div style="display:flex;justify-content:space-between;padding:6px 0;">${p.icon} ${p.method} - ${p.number} <button class="btn-sm danger" onclick="deletePayment(${i})">🗑️</button></div>`
+        ).join('');
+    }
+    async function addPayment() {
+        const m = document.getElementById('payMethod').value.trim();
+        const n = document.getElementById('payNumber').value.trim();
+        if (!m||!n) return;
+        configData.payments.push({method:m, number:n, icon:'💳'});
+        await saveConfig();
+        renderPayments();
+    }
+    async function deletePayment(i) { configData.payments.splice(i,1); await saveConfig(); renderPayments(); }
+
+    // ========== COUPONS ==========
+    function renderCoupons() {
+        document.getElementById('couponList').innerHTML = Object.keys(configData.coupons||{}).map(k => 
+            `<div style="display:flex;justify-content:space-between;">${k} - ${(configData.coupons[k].discount*100)}% <button class="btn-sm danger" onclick="deleteCoupon('${k}')">🗑️</button></div>`
+        ).join('');
+    }
+    async function addCoupon() {
+        const c = document.getElementById('couponCode').value.trim().toUpperCase();
+        const d = parseFloat(document.getElementById('couponDiscount').value);
+        if (!c || d<=0 || d>100) return;
+        configData.coupons[c] = {discount:d/100, desc:`Diskon ${d}%`};
+        await saveConfig();
+        renderCoupons();
+    }
+    async function deleteCoupon(k) { delete configData.coupons[k]; await saveConfig(); renderCoupons(); }
+
+    // ========== BANNERS ==========
+    function renderBanners() {
+        document.getElementById('bannerList').innerHTML = (configData.banners||[]).map((b,i) => 
+            `<div><img src="${b.url}" style="width:80px;height:50px;object-fit:cover;"> <button class="btn-sm danger" onclick="deleteBanner(${i})">🗑️</button></div>`
+        ).join('');
+    }
+    async function addBanner() {
+        const url = document.getElementById('bannerUrl').value.trim();
+        if (!url) return;
+        configData.banners.push({url});
+        await saveConfig();
+        renderBanners();
+    }
+    async function deleteBanner(i) { configData.banners.splice(i,1); await saveConfig(); renderBanners(); }
+
+    // ========== SETTINGS ==========
+    async function saveAdminPass() {
+        const p = document.getElementById('newAdminPass').value.trim();
+        if (p.length < 4) { showAlert('Min 4 karakter'); return; }
+        configData.adminPass = p;
+        await saveConfig();
+        toast('✅ Password diupdate');
+    }
+    async function resetToDefault() {
+        if (!confirm('Reset?')) return;
+        configData = {
+            categories: {
+                hok: { name:"Honor of Kings", type:"game", icon:"👑", unit:"Token", serverOptions:[{value:"Asia",text:"Asia"}], packages:[], gameUrl:"", coverUrl:"" },
+                kuota: { name:"Kuota Internet", type:"voucher", icon:"📱", unit:"GB", serverOptions:[], packages:[], gameUrl:"", coverUrl:"" }
+            },
+            payments: [{method:"Dana",number:"083170617054",icon:"💙"}],
+            coupons: {},
+            banners: [],
+            adminPass: "admin123",
+            background: {}
+        };
+        await saveConfig();
+        loadAll();
+        toast('✅ Direset');
+    }
+
+    // Tab navigation
+    document.querySelectorAll('.tabs button').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.getElementById('panel-' + this.dataset.tab).classList.add('active');
+        });
+    });
+</script>
+</body>
+</html>
